@@ -12,32 +12,37 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Deploy and set permissions
+    - name: Deploy files with proper permissions
       uses: appleboy/ssh-action@v0.1.10
       with:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          # Navigate to your web directory
-          cd /var/www/html/simple-webpage/
+          # Create a temporary directory on server
+          TEMP_DIR="/tmp/deploy-$(date +%s)"
+          mkdir -p $TEMP_DIR
           
-          # Remove existing files (except maybe config files)
-          sudo rm -rf ./*
-          sudo rm -rf ./.* 2>/dev/null || true
-          
-          # Copy only the necessary files (no .git folder)
-          # You might need to adjust this based on your file structure
-          sudo cp -r $GITHUB_WORKSPACE/* ./
-          sudo cp -r $GITHUB_WORKSPACE/.??* ./ 2>/dev/null || true
+          # Copy ONLY the necessary files (no .git folder)
+          sudo cp -r $GITHUB_WORKSPACE/* $TEMP_DIR/ 2>/dev/null || true
+          sudo cp -r $GITHUB_WORKSPACE/.[^.]* $TEMP_DIR/ 2>/dev/null || true
           
           # Remove any .git files that might have been copied
-          sudo rm -rf ./.git* 2>/dev/null || true
+          sudo rm -rf $TEMP_DIR/.git* 2>/dev/null || true
+          sudo rm -rf $TEMP_DIR/.github 2>/dev/null || true
+          
+          # Clear the target directory and copy files
+          sudo rm -rf /var/www/html/simple-webpage/*
+          sudo rm -rf /var/www/html/simple-webpage/.* 2>/dev/null || true
+          sudo cp -r $TEMP_DIR/* /var/www/html/simple-webpage/
           
           # Set proper permissions
-          sudo chown -R www-data:www-data ./
-          sudo chmod -R 755 ./
-          sudo find . -type f -exec chmod 644 {} \;
+          sudo chown -R www-data:www-data /var/www/html/simple-webpage/
+          sudo chmod -R 755 /var/www/html/simple-webpage/
+          sudo find /var/www/html/simple-webpage/ -type f -exec chmod 644 {} \;
+          
+          # Clean up
+          sudo rm -rf $TEMP_DIR
           
           # Restart Apache
           sudo systemctl restart apache2
