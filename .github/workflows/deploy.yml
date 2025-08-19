@@ -12,38 +12,32 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Deploy via SSH (rsync method)
+    - name: Deploy and set permissions
       uses: appleboy/ssh-action@v0.1.10
       with:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          # Create a temporary directory
-          mkdir -p /tmp/deploy-temp
+          # Navigate to your web directory
+          cd /var/www/html/simple-webpage/
           
-    - name: Copy files with rsync (better method)
-      uses: burnett01/rsync-deployments@6.0.0
-      with:
-        switches: -avz --delete
-        path: ./
-        remote_path: /var/www/html/simple-webpage/
-        remote_host: ${{ secrets.SSH_HOST }}
-        remote_user: ${{ secrets.SSH_USERNAME }}
-        remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
-        exclude: |
-          .git/
-          .github/
-          .gitignore
-          README.md
+          # Remove existing files (except maybe config files)
+          sudo rm -rf ./*
+          sudo rm -rf ./.* 2>/dev/null || true
           
-    - name: Set permissions and restart Apache
-      uses: appleboy/ssh-action@v0.1.10
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          sudo chown -R www-data:www-data /var/www/html/simple-webpage/
-          sudo chmod -R 755 /var/www/html/simple-webpage/
+          # Copy only the necessary files (no .git folder)
+          # You might need to adjust this based on your file structure
+          sudo cp -r $GITHUB_WORKSPACE/* ./
+          sudo cp -r $GITHUB_WORKSPACE/.??* ./ 2>/dev/null || true
+          
+          # Remove any .git files that might have been copied
+          sudo rm -rf ./.git* 2>/dev/null || true
+          
+          # Set proper permissions
+          sudo chown -R www-data:www-data ./
+          sudo chmod -R 755 ./
+          sudo find . -type f -exec chmod 644 {} \;
+          
+          # Restart Apache
           sudo systemctl restart apache2
