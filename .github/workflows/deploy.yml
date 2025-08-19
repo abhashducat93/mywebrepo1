@@ -1,26 +1,29 @@
-name: Deploy to Self-Hosted Server
+name: CI Workflow
 
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  deploy:
-    runs-on: self-hosted  # This tells GitHub to use your self-hosted runner
+  build:
+    runs-on: ubuntu-latest  # This specifies a GitHub-hosted runner
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
-      
-    - name: Install dependencies (if any)
-      run: echo "Installing dependencies..."
-      
-    - name: Deploy to server
-      run: |
-        # Replace with your deployment commands
-        echo "Deploying to self-hosted server..."
-        # Example commands (customize for your server):
-        sudo cp -r . /var/www/html/simple-webpage/
-        sudo chown -R www-data:www-data /var/www/html/simple-webpage/
-        sudo systemctl restart apache2  # or nginx if you're using that
-
+      uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Run tests
+      run: npm test
+    
+    - name: Build project
+      run: npm run build
